@@ -1,0 +1,286 @@
+#+OPTIONS: ':nil *:t -:t ::t <:t H:3 \n:nil ^:t arch:headline author:t
+#+OPTIONS: broken-links:nil c:nil creator:nil d:(not "LOGBOOK") date:t e:t
+#+OPTIONS: email:nil f:t inline:t num:t p:nil pri:nil prop:nil stat:t tags:t
+#+OPTIONS: tasks:t tex:t timestamp:t title:t toc:t todo:t |:t
+#+TITLE: Project Description
+#+DATE: <2018-07-01 Sun>
+#+AUTHOR: Milo Cress
+#+EMAIL: milo@archlinux
+#+LANGUAGE: en
+#+SELECT_TAGS: export
+#+EXCLUDE_TAGS: noexport
+#+CREATOR: Emacs 26.1 (Org mode 9.1.6)
+
+* TODO Problem
+  As computer graphics advance in processing power, the visual detail that graphics processors can render also increases, requiring a larger amount of data to render. The goal of this project is to explore on-the-fly creation of 3-dimensional rendering data, which would limit the amount of data required to render a scene by generating visually relevant areas at a higher level of detail than non-visually relevant areas. While traditional models are stored at a consistent level of detail throughout the scene, this project attempts to create models that comprise only a fraction of the scene, but relative to the viewer, appear to comprise the entire scene.
+* TODO Solution Prototype
+  This project uses procedural terrain generation that functions on a variety of spatial and temporal scales, at a realistic level of detail. It is divided into two parts: the sector event buffer, and the Sector Tree.
+  Implementation of procedural terrain generation with fixed geometries and Levels of Detail, as well as simulation of natural events such as erosion, continental drift, etc.
+** TODO Coordinate System
+   #+BEGIN_SRC haskell :tangle myworld/src/Coordinate.hs
+     module Coordinate where
+
+     data Coordinate = Planar { x_coord :: Double
+                              , y_coord :: Double }
+                     | Spherical { latitude  :: Double
+                                 , longitude :: Double }
+                     | Cubic { x_coord :: Double,
+                               y_coord :: Double,
+                               z_coord :: Double
+                             }
+
+     newtype Transform = Transform { runTransform :: Coordinate -> Coordinate }
+   #+END_SRC
+** Mapping System
+
+   We will use the programming language, Haskell, to prototype our system:
+
+   #+BEGIN_SRC haskell :tangle myworld/src/Map.hs
+     module Map where
+     import Coordinate
+     import Data.Functor.Identity
+     import Control.Monad.Trans.Class
+
+     newtype MapT m a = MapT { runMapT :: Coordinate -> m a }
+
+     instance Functor m => Functor (MapT m) where
+       fmap f x = MapT $ \p -> fmap f ( runMapT x p )
+
+     instance Applicative m => Applicative (MapT m) where
+       f <*> x = MapT $ \p -> runMapT f p <*> runMapT x p
+       pure  x = MapT $ \_ -> pure x
+
+     instance Monad m => Monad (MapT m) where
+       (>>=)  = bind
+       return = unit
+
+     bind :: Monad m => MapT m a -> (a -> MapT m b) -> MapT m b
+     bind x f = MapT $ \p -> do
+       pointAttr <- runMapT x p
+       runMapT ( f pointAttr ) p
+
+     unit :: Monad m => a -> MapT m a
+     unit x = MapT $ \_ -> return x
+
+     instance (Applicative m, Num a) => Num (MapT m a) where
+       a + b = (+) <$> a <*> b
+       a - b = (-) <$> a <*> b
+       a * b = (*) <$> a <*> b
+       abs a = abs <$> a
+       signum a = signum <$> a
+       fromInteger = pure . fromInteger
+
+     instance MonadTrans MapT where
+       lift = MapT . const
+
+     type Height = Double
+     type Heightmap = Map Height
+     type Map = MapT Identity
+
+     runMap :: Map a -> Coordinate -> a
+     runMap m p = runIdentity (runMapT m p)
+   #+END_SRC
+
+   #+BEGIN_SRC haskell :tangle myworld/src/MapExamples.hs
+     {-# LANGUAGE LambdaCase #-}
+     module MapExamples where
+
+     import Coordinate
+     import Map
+
+     type MaybeHeightmap = MapT Maybe Height
+
+     flatMap :: MaybeHeightmap
+     flatMap = return 1.0
+
+     -- The unit declaration above is synonymous with the following, but more readable (and therefore preferred):
+     -- flatMap = Map $ \_ -> Just 1.0
+
+     -- Any calls to getPointAttr of flatMap will return 1.0 -- this is the most basic and simple kind of map.
+     -- Ex:
+     -- getPointAttr flatMap (Planar 1 2)
+     -- getPointAttr flatMap (Spherical Infinity 0.0)
+     -- As we can see, unit declarations don't sanity-check inputs, but don't need to. They can take any input.
+
+     bumpyMap :: MaybeHeightmap
+     bumpyMap = MapT $ \case
+       Planar x y -> Just $ sin x * cos y
+       _          -> Nothing
+
+     -- Note that since bumpyMap works around the Maybe monad, it's possible for the function to fail, such as when
+     -- it's applied to a coordinate that is non-planar.
+     -- Richer monadic wrappers can result in more expressive error messages, such as (Left "spherical coordinates not
+     -- supported" -- a result of the Either monad).
+     type MaybeHeightmap' = MapT (Either String) Height
+
+     bumpyMap' :: MaybeHeightmap'
+     bumpyMap' = MapT $ \case
+       Planar x y -> Right $ sin x * cos y
+       _          -> Left "Spherical coordinates not supported"
+
+     -- Now, we can use monadic binding to compose maps! Yay!
+     flatAndBumpy :: MaybeHeightmap
+     flatAndBumpy = do
+       h  <- flatMap
+       h' <- bumpyMap
+       return $ h + h'
+     -- This is remarkably compact syntax compared to a non-monadic style, and forms the basis for the implementation
+     -- of the Num typeclass (the Num implementation has since been rewritten to use the more succinct Applicative
+     -- syntax, but it is easy to imagine how Num could be written with monads).
+
+     -- instance (Monad m, Num a) => Num (MapT m a) where
+     --   a + b = do
+     --     v  <- a
+     --     v' <- b
+     --     return $ v + v'
+     --   ...
+     --   abs a = do
+     --     v <- a
+     --     return $ abs v
+     --   fromInteger = return . fromInteger
+
+     -- As a matter of fact, now that arithmetic is implemented for Maps, it's much simpler to define flatAndBumpy:
+     flatAndBumpy' :: MaybeHeightmap
+     flatAndBumpy' = flatMap + bumpyMap
+
+     -- These expressions become even more powerful when used to transform types. For example, imagine that a
+     -- topographical map (hMap :: heightmap), a roughness map (rMap :: MapT Maybe Double), and a wetmap (wMap :: MapT
+     -- Maybe Bool) are to be displayed by a program as an image, using the red, green, and blue channels to indicate
+     -- elevation, roughness, and water distribution, respectively. A simple color library exists which has the type
+     -- constructor:
+     -- RGB :: Double -> Double -> Double -> Color
+     data Color = RGB { red :: Double, blue :: Double, green :: Double }
+     -- In order to display the map, we need to convert the heightmap to a Color map.
+     type Colormap = Map Color
+     -- We can use monads for this!
+     toColorMap :: Heightmap -> Map Double -> Map Bool -> Colormap
+     toColorMap hMap rMap wMap = do
+       height    <- hMap
+       roughness <- rMap
+       wetness   <- wMap
+       let w_val = if wetness then 1 else 0
+         in return $ RGB height roughness w_val
+
+     -- We can also use applicatives.
+     toColorMap' :: Heightmap -> Map Double -> Map Bool -> Colormap
+     toColorMap' hMap rMap wMap = RGB <$> hMap <*> rMap <*> fmap (\x -> if x then 1 else 0) wMap
+     -- While the monadic version is the more readable of the two (but not by a large margin), the applicative version
+     -- is far more succinct. At this point it's debatable which style to use. I believe that for calculations which
+     -- require a great deal of nested unwrapping, composition, and/or mapping, a monadic style is appropriate.
+     -- For simpler calculations (such as the one above) which are more a matter of applying a function to the value
+     -- contained by a monad rather than to the monad itself (with minimal nesting such as the if-else block), the
+     -- applicative style is cleaner.
+
+     -- On the other hand, complex calculations, which "require a great deal of nested unwrapping, composition, and/or"
+     -- mapping, can be composed of simpler applicative-style functions. I'm honestly not sure what the monadic style is
+     -- useful for at this point, but it's implementation will be preserved in case I think of something.
+
+
+     runMaybeMap :: MapT Maybe a -> a -> Coordinate -> a
+     runMaybeMap m failval = runMap . MapT $ \p ->
+       case runMapT m p of
+         Just x  -> return x
+         Nothing -> return failval
+
+     -- Another nice thing is that we can implement custom logic to change the underlying monad of a MapT (or map for
+     -- that matter)
+   #+END_SRC
+
+** TODO Maps to Images
+   #+BEGIN_SRC haskell :tangle ./myworld/src/PixelMap.hs
+     module PixelMap where
+
+     import Codec.Picture.Types
+     import Data.Array.Repa
+     import Map
+     import Coordinate
+     import Data.Functor.Identity
+
+     type RGB8     = (Pixel8, Pixel8, Pixel8)
+     type PixelMap = Map PixelRGB8
+
+     type RGBMap   = Map RGB8
+
+     toPixel :: RGB8 -> PixelRGB8
+     toPixel (r, g, b) = PixelRGB8 r g b
+
+     fromPixelMap :: PixelMap -> (Double -> Double -> Coordinate) -> Int -> Int -> Image PixelRGB8
+     fromPixelMap m f = generateImage $ \x y -> runMap m $ f (fromIntegral x) (fromIntegral y)
+     -- f is a constructor for Coordinate.
+
+     fromRGBMap :: RGBMap -> (Double -> Double -> Coordinate) -> Int -> Int -> Image PixelRGB8
+     fromRGBMap  m f w h = fromArrToImg . unboxArr $ fromMapToArr m f w h
+
+     unboxArr :: Array D DIM2 RGB8 -> Array U DIM2 RGB8
+     unboxArr = runIdentity . computeUnboxedP
+
+     fromMapToArr :: RGBMap -> (Double -> Double -> Coordinate) -> Int -> Int -> Array D DIM2 RGB8
+     fromMapToArr m f w h = fromFunction (Z :. w :. h) $ \(Z :. x :. y) ->
+       runMap m $ f (fromIntegral x) (fromIntegral y)
+
+     fromArrToImg :: Array U DIM2 RGB8 -> Image PixelRGB8
+     fromArrToImg a =
+       let (Z :. w :. h) = extent a
+       in generateImage (\x y -> toPixel $ a ! (Z :. x :. y)) w h
+   #+END_SRC
+** TODO Sector Tree
+   Implementation of a =SectorTree=, along with code that divides sectors into smaller child sectors, as well as control code that decides how/when to expand or prune branches of the sector tree.
+   #+BEGIN_SRC haskell
+   #+END_SRC
+
+** Stack Setup
+   #+BEGIN_SRC haskell :tangle ./myworld/app/Main.hs
+     module Main where
+
+     import PixelMap
+     import Map
+     import Coordinate
+     import Codec.Picture.Types
+     import Codec.Picture
+     import Data.Complex
+
+     file :: String
+     file = "./map.png"
+
+     main :: IO ()
+     -- main = savePngImage file $ ImageRGB8 $ fromPixelMap m_mand Planar 1920 1080
+     main = savePngImage file . ImageRGB8 $ fromRGBMap m_mand' Planar 1920 1080
+
+     gradient :: PixelMap
+     gradient = MapT $ \(Planar x y) -> return $ PixelRGB8 (mod (floor x) 255) (mod (floor y) 255) 255
+
+     m_mand :: PixelMap
+     m_mand = mandelmap 1000 $ Transform $ \(Planar x y) -> Planar (x / 600 - 2) (y / 600 - (1080/1200))
+
+     mandelmap :: Int -> Transform -> PixelMap
+     mandelmap n xform = MapT $ \p -> return $
+       let (Planar x y) = runTransform xform p
+           z            = x :+ y
+       in if mandelbrot z z n then black else white
+
+     mandelbrot :: Complex Double -> Complex Double -> Int -> Bool
+     mandelbrot z _ _ | (sqr $ realPart z) + (sqr $ imagPart z) > 4 = False where sqr a = a * a
+     mandelbrot _ _ i | i <= 0 = True
+     mandelbrot z c i = mandelbrot (z*z + c) c (i - 1)
+
+     black :: PixelRGB8
+     black = PixelRGB8 0 0 0
+
+     white :: PixelRGB8
+     white = PixelRGB8 255 255 255
+
+     mandelmap' :: Int -> Transform -> RGBMap
+     mandelmap' n xform = MapT $ \p -> return $
+       let (Planar x y) = runTransform xform p
+           z                = x :+ y
+       in if mandelbrot z z n then black' else white'
+
+     black' :: RGB8
+     black' = (0, 0, 0)
+
+     white' :: RGB8
+     white' = (255, 255, 255)
+
+     m_mand' :: RGBMap
+     m_mand' = mandelmap' 1000 $ Transform $ \(Planar x y) -> Planar (x / 600 - 2) (y / 600 - (1080/1200))
+   #+END_SRC

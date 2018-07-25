@@ -1,0 +1,52 @@
+% Created 2018-07-19 Thu 11:28
+% Intended LaTeX compiler: pdflatex
+\documentclass[11pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{graphicx}
+\usepackage{grffile}
+\usepackage{longtable}
+\usepackage{wrapfig}
+\usepackage{rotating}
+\usepackage[normalem]{ulem}
+\usepackage{amsmath}
+\usepackage{textcomp}
+\usepackage{amssymb}
+\usepackage{capt-of}
+\usepackage{hyperref}
+\author{Milo Cress}
+\date{\textit{<2018-07-01 Sun>}}
+\title{Project Description}
+\hypersetup{
+ pdfauthor={Milo Cress},
+ pdftitle={Project Description},
+ pdfkeywords={},
+ pdfsubject={},
+ pdfcreator={Emacs 26.1 (Org mode 9.1.6)}, 
+ pdflang={English}}
+\begin{document}
+
+\maketitle
+\tableofcontents
+
+
+\section{{\bfseries\sffamily TODO} Problem}
+\label{sec:org94bf369}
+As computer graphics advance in processing power, the visual detail that graphics processors can render also increases, requiring a larger amount of data to render. The goal of this project is to explore on-the-fly creation of 3-dimensional rendering data, which would limit the amount of data required to render a scene by generating visually relevant areas at a higher level of detail than non-visually relevant areas. While traditional models are stored at a consistent level of detail throughout the scene, this project attempts to create models that comprise only a fraction of the scene, but relative to the viewer, appear to comprise the entire scene.
+\section{{\bfseries\sffamily TODO} Solution}
+\label{sec:orgcae93ad}
+This project uses procedural terrain generation that functions on a variety of spatial and temporal scales, at a realistic level of detail. It is divided into two parts: the sector event buffer, and the Sector Tree.
+\subsection{{\bfseries\sffamily TODO} Sector Event Buffer}
+\label{sec:orgae3604d}
+Implementation of procedural terrain generation with fixed geometries and Levels of Detail, as well as simulation of natural events such as erosion, continental drift, etc.
+
+We will use the programming language, Haskell, to prototype our system:
+\begin{verbatim}
+main :: IO ()
+main = putStrLn "test"
+\end{verbatim}
+
+\subsection{{\bfseries\sffamily TODO} Sector Tree}
+\label{sec:org569f2ce}
+Implementation of a \texttt{SectorTree}, along with code that divides sectors into smaller child sectors, as well as control code that decides how/when to expand or prune branches of the sector tree.
+\end{document}
