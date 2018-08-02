@@ -1,9 +1,9 @@
 module Map where
-import Coordinate
+import PlanarCoordinate
 import Data.Functor.Identity
 import Control.Monad.Trans.Class
 
-newtype MapT m a = MapT { runMapT :: Coordinate -> m a }
+newtype MapT m a = MapT { runMapT :: PlanarCoordinate -> m a }
 
 instance Functor m => Functor (MapT m) where
   fmap f x = MapT $ \p -> fmap f ( runMapT x p )
@@ -39,5 +39,15 @@ type Height = Double
 type Heightmap = Map Height
 type Map = MapT Identity
 
-runMap :: Map a -> Coordinate -> a
+runMap :: Map a -> PlanarCoordinate -> a
 runMap m p = runIdentity (runMapT m p)
+
+type BoundedMap a = MapT Maybe a
+
+layerAdd :: (Num a) => Map a -> BoundedMap a -> Map a
+bot `layerAdd` top = MapT $ \p ->
+  let a = runIdentity $ runMapT bot p
+      b = runMapT top p
+  in case b of
+    Just x  -> return $ a + x
+    Nothing -> return   a
