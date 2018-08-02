@@ -41,13 +41,3 @@ type Map = MapT Identity
 
 runMap :: Map a -> PlanarCoordinate -> a
 runMap m p = runIdentity (runMapT m p)
-
-type BoundedMap a = MapT Maybe a
-
-layerAdd :: (Num a) => Map a -> BoundedMap a -> Map a
-bot `layerAdd` top = MapT $ \p ->
-  let a = runIdentity $ runMapT bot p
-      b = runMapT top p
-  in case b of
-    Just x  -> return $ a + x
-    Nothing -> return   a

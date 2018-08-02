@@ -17,7 +17,7 @@
   This project uses procedural terrain generation that functions on a variety of spatial and temporal scales, at a realistic level of detail. It is divided into two parts: the sector event buffer, and the Sector Tree.
   Implementation of procedural terrain generation with fixed geometries and Levels of Detail, as well as simulation of natural events such as erosion, continental drift, etc.
 ** TODO Coordinate System
-   #+BEGIN_SRC haskell :tangle myworld/src/PlanarCoordinate.hs
+   #+BEGIN_SRC haskell :tangle ./PlanarCoordinate.hs
      module PlanarCoordinate where
 
      type Scalar = Double
@@ -68,7 +68,7 @@
 
    We will use the programming language, Haskell, to prototype our system:
 
-   #+BEGIN_SRC haskell :tangle myworld/src/Map.hs
+   #+BEGIN_SRC haskell :tangle ./myworld/src/Map.hs
      module Map where
      import PlanarCoordinate
      import Data.Functor.Identity
@@ -113,18 +113,9 @@
      runMap :: Map a -> PlanarCoordinate -> a
      runMap m p = runIdentity (runMapT m p)
 
-     type BoundedMap a = MapT Maybe a
-
-     layerAdd :: (Num a) => Map a -> BoundedMap a -> Map a
-     bot `layerAdd` top = MapT $ \p ->
-       let a = runIdentity $ runMapT bot p
-           b = runMapT top p
-       in case b of
-         Just x  -> return $ a + x
-         Nothing -> return   a
    #+END_SRC
 
-   #+BEGIN_SRC haskell :tangle myworld/src/MapExamples.hs
+   #+BEGIN_SRC haskell :tangle ./myworld/src/MapExamples.hs
       {-# LANGUAGE LambdaCase #-}
       module MapExamples where
 
@@ -241,6 +232,17 @@
 
      import Map
      import PlanarCoordinate
+
+
+     type BoundedMap a = MapT Maybe a
+
+     layerAdd :: (Num a) => Map a -> BoundedMap a -> Map a
+     bot `layerAdd` top = MapT $ \p ->
+       let a = runIdentity $ runMapT bot p
+           b = runMapT top p
+       in case b of
+         Just x  -> return $ a + x
+         Nothing -> return   a
    #+END_SRC
 ** TODO Maps to Images
    #+BEGIN_SRC haskell :tangle ./myworld/src/Resolution.hs
@@ -413,7 +415,8 @@
            n = read $ args !! 3
            w = read $ args !! 4
            h = read $ args !! 5
-         in saveMandelimg file n (XYR x y r) (Resolution w h)
+           f = read $ args !! 6
+         in saveMandelimg f n (XYR x y r) (Resolution w h)
      -- X = -0.16
      -- Y = 1.0405
      -- R = 0.026
