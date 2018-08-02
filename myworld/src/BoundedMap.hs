@@ -6,10 +6,19 @@ import PlanarCoordinate
 
 type BoundedMap a = MapT Maybe a
 
-layerAdd :: (Num a) => Map a -> BoundedMap a -> Map a
-bot `layerAdd` top = MapT $ \p ->
-  let a = runIdentity $ runMapT bot p
-      b = runMapT top p
-  in case b of
-    Just x  -> return $ a + x
-    Nothing -> return   a
+runBoundedMap :: BoundedMap a -> PlanarCoordinate -> Maybe a
+runBoundedMap = runMapT
+
+-- Layer overlapping
+(<+>) :: (Functor m, Num a) => MapT m a -> BoundedMap a -> MapT m a
+bot <+> top = MapT $ \p ->
+  case runBoundedMap top p of
+    Nothing -> runMapT bot p
+    Just x  -> (+x) <$> runMapT bot p
+
+
+(>>>) :: (Applicative m) => MapT m a -> BoundedMap a -> MapT m a
+bot >>> top = MapT $ \p ->
+  case runBoundedMap top p of
+    Nothing -> runMapT bot p
+    Just x  -> pure x
