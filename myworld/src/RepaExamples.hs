@@ -9,7 +9,7 @@ import Map
 import PlanarCoordinate
 import Resolution
 
-data XYR = XYR { xyr_x :: Double, xyr_y :: Double, xyr_r :: Double } 
+data XYR = XYR { xyr_x :: Double, xyr_y :: Double, xyr_r :: Double }
 xyrToSector :: XYR -> Sector
 xyrToSector (XYR x y r) = Sector (Planar (x - r) (y + r)) (Planar (x + r) (y - r))
 
