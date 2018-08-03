@@ -24,6 +24,7 @@ dependencies:
 - transformers
 - repa
 - JuicyPixels
+- vector
 
 library:
   source-dirs: src

@@ -16,8 +16,8 @@
 * TODO Solution Prototype
   This project uses procedural terrain generation that functions on a variety of spatial and temporal scales, at a realistic level of detail. It is divided into two parts: the sector event buffer, and the Sector Tree.
   Implementation of procedural terrain generation with fixed geometries and Levels of Detail, as well as simulation of natural events such as erosion, continental drift, etc.
-** TODO Coordinate System
-   #+BEGIN_SRC haskell :tangle ./PlanarCoordinate.hs
+** Coordinate System
+   #+BEGIN_SRC haskell :tangle ./myworld/src/PlanarCoordinate.hs
      module PlanarCoordinate where
 
      type Scalar = Double
@@ -37,6 +37,14 @@
 
      data Sector = Sector { top_left     :: PlanarCoordinate
                           , bottom_right :: PlanarCoordinate } deriving (Show)
+
+     inSector :: Sector -> PlanarCoordinate -> Bool
+     inSector (Sector (Planar a b) (Planar c d)) (Planar x y) =
+       between_inclusive a c x &&
+       between_inclusive d b y
+
+     between_inclusive :: Scalar -> Scalar -> Scalar -> Bool
+     between_inclusive bot top x = x >= bot && x <= top
 
      width :: Sector -> Scalar
      width (Sector (Planar a _) (Planar b _)) = b - a
@@ -233,32 +241,69 @@
      import Map
      import PlanarCoordinate
 
-
      type BoundedMap a = MapT Maybe a
 
      runBoundedMap :: BoundedMap a -> PlanarCoordinate -> Maybe a
      runBoundedMap = runMapT
 
-     -- Layer overlapping
+     -- Non-strict Map addition
      (<+>) :: (Functor m, Num a) => MapT m a -> BoundedMap a -> MapT m a
      bot <+> top = MapT $ \p ->
        case runBoundedMap top p of
          Nothing -> runMapT bot p
          Just x  -> (+x) <$> runMapT bot p
 
-
+     -- Non-strict Map overlaying
      (>>>) :: (Applicative m) => MapT m a -> BoundedMap a -> MapT m a
      bot >>> top = MapT $ \p ->
        case runBoundedMap top p of
          Nothing -> runMapT bot p
          Just x  -> pure x
+
+     fromMap :: Map a -> Sector -> BoundedMap a
+     fromMap m s = MapT $ \p ->
+       if inSector s p
+       then Just $ runMap m p
+       else Nothing
+
+     toMap :: BoundedMap a -> a -> Map a
+     toMap m failval = return failval >>> m
+   #+END_SRC
+** ArrayMaps
+   #+BEGIN_SRC haskell :tangle ./myworld/src/ArrayMap.hs
+     module ArrayMap where
+
+     import Data.Array.Repa
+     import qualified Data.Vector.Unboxed as U
+
+     import Map
+     import BoundedMap
+     import PlanarCoordinate
+     import Resolution
+
+     type ArrayMap a = BoundedMap a
+
+     runArrayMap :: ArrayMap a -> PlanarCoordinate -> Maybe a
+     runArrayMap = runBoundedMap
+
+     fromArray :: U.Unbox a => Array U DIM2 a -> ArrayMap a
+     fromArray arr =
+       let (Z :. a :. b) = extent arr
+       in fromMap (MapT $ \(Planar x y) -> return $ arr ! Z :. (floor x) :. (floor y)) (resToSector $ Resolution a b)
    #+END_SRC
 ** TODO Maps to Images
    #+BEGIN_SRC haskell :tangle ./myworld/src/Resolution.hs
      module Resolution where
 
+     import PlanarCoordinate 
+
      data Resolution = Resolution { image_width  :: Int
                                   , image_height :: Int} deriving (Show)
+
+     resToSector :: Resolution -> Sector
+     resToSector (Resolution x y) = Sector
+                                    (Planar 0 (fromIntegral y))
+                                    (Planar (fromIntegral x) 0)
    #+END_SRC
 
    #+BEGIN_SRC haskell :tangle ./myworld/src/PixelMap.hs
@@ -347,11 +392,6 @@
      fromArrToImg a =
        let (Z :. w :. h) = extent a
        in generateImage (\x y -> toPixel $ a ! (Z :. x :. y)) w h
-
-     resToSector :: Resolution -> Sector
-     resToSector (Resolution x y) = Sector
-                                    (Planar 0 (fromIntegral y))
-                                    (Planar (fromIntegral x) 0)
    #+END_SRC
 
    #+BEGIN_SRC haskell :tangle ./myworld/src/RepaExamples.hs
@@ -366,7 +406,7 @@
      import PlanarCoordinate
      import Resolution
 
-     data XYR = XYR { xyr_x :: Double, xyr_y :: Double, xyr_r :: Double } 
+     data XYR = XYR { xyr_x :: Double, xyr_y :: Double, xyr_r :: Double }
      xyrToSector :: XYR -> Sector
      xyrToSector (XYR x y r) = Sector (Planar (x - r) (y + r)) (Planar (x + r) (y - r))
 

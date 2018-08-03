@@ -28,8 +28,3 @@ fromArrToImg :: Array U DIM2 RGB8 -> Image PixelRGB8
 fromArrToImg a =
   let (Z :. w :. h) = extent a
   in generateImage (\x y -> toPixel $ a ! (Z :. x :. y)) w h
-
-resToSector :: Resolution -> Sector
-resToSector (Resolution x y) = Sector
-                               (Planar 0 (fromIntegral y))
-                               (Planar (fromIntegral x) 0)
