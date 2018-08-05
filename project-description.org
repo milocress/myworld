@@ -439,6 +439,9 @@
    #+END_SRC
 
 ** Stack Setup
+   Examples: 
+   - =stack exec myworld-exe 0.29 0.015 0.00095 300 7680 4320 elephants.png=
+   - =stack exec myworld-exe -0.7443 0.109 0.005 250 7680 4320 spirals.png=
    #+BEGIN_SRC haskell :tangle ./myworld/app/Main.hs
      module Main where
 
@@ -463,7 +466,7 @@
            n = read $ args !! 3
            w = read $ args !! 4
            h = read $ args !! 5
-           f = read $ args !! 6
+           f = args !! 6
          in saveMandelimg f n (XYR x y r) (Resolution w h)
      -- X = -0.16
      -- Y = 1.0405

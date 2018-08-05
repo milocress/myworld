@@ -21,7 +21,7 @@ main = do
       n = read $ args !! 3
       w = read $ args !! 4
       h = read $ args !! 5
-      f = read $ args !! 6
+      f = args !! 6
     in saveMandelimg f n (XYR x y r) (Resolution w h)
 -- X = -0.16
 -- Y = 1.0405
