@@ -222,7 +222,7 @@
       -- useful for at this point, but it's implementation will be preserved in case I think of something.
 
 
-      -- Consider this function, runMaybeMap, to be a precursor to Layer addition of BoundedMaps.
+      -- Consider this function, runMaybeMap, to be a precursor to Layer addition of SectorMaps.
       runMaybeMap :: MapT Maybe a -> a -> PlanarCoordinate -> a
       runMaybeMap m failval = runMap . MapT $ \p ->
         case runMapT m p of
@@ -235,38 +235,38 @@
    #+END_SRC
 
 ** Bounded Maps
-   #+BEGIN_SRC haskell :tangle ./myworld/src/BoundedMap.hs
-     module BoundedMap where
+   #+BEGIN_SRC haskell :tangle ./myworld/src/SectorMap.hs
+     module SectorMap where
 
      import Map
      import PlanarCoordinate
 
-     type BoundedMap a = MapT Maybe a
+     type SectorMap a = MapT Maybe a
 
-     runBoundedMap :: BoundedMap a -> PlanarCoordinate -> Maybe a
-     runBoundedMap = runMapT
+     runSectorMap :: SectorMap a -> PlanarCoordinate -> Maybe a
+     runSectorMap = runMapT
 
      -- Non-strict Map addition
-     (<+>) :: (Functor m, Num a) => MapT m a -> BoundedMap a -> MapT m a
+     (<+>) :: (Functor m, Num a) => MapT m a -> SectorMap a -> MapT m a
      bot <+> top = MapT $ \p ->
-       case runBoundedMap top p of
+       case runSectorMap top p of
          Nothing -> runMapT bot p
          Just x  -> (+x) <$> runMapT bot p
 
      -- Non-strict Map overlaying
-     (>>>) :: (Applicative m) => MapT m a -> BoundedMap a -> MapT m a
+     (>>>) :: (Applicative m) => MapT m a -> SectorMap a -> MapT m a
      bot >>> top = MapT $ \p ->
-       case runBoundedMap top p of
+       case runSectorMap top p of
          Nothing -> runMapT bot p
          Just x  -> pure x
 
-     fromMap :: Map a -> Sector -> BoundedMap a
+     fromMap :: Map a -> Sector -> SectorMap a
      fromMap m s = MapT $ \p ->
        if inSector s p
        then Just $ runMap m p
        else Nothing
 
-     toMap :: BoundedMap a -> a -> Map a
+     toMap :: SectorMap a -> a -> Map a
      toMap m failval = return failval >>> m
    #+END_SRC
 ** ArrayMaps
@@ -277,14 +277,14 @@
      import qualified Data.Vector.Unboxed as U
 
      import Map
-     import BoundedMap
+     import SectorMap
      import PlanarCoordinate
      import Resolution
 
-     type ArrayMap a = BoundedMap a
+     type ArrayMap a = SectorMap a
 
      runArrayMap :: ArrayMap a -> PlanarCoordinate -> Maybe a
-     runArrayMap = runBoundedMap
+     runArrayMap = runSectorMap
 
      fromArray :: U.Unbox a => Array U DIM2 a -> ArrayMap a
      fromArray arr =

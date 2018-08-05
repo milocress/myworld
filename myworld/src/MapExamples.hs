@@ -96,7 +96,7 @@
  -- useful for at this point, but it's implementation will be preserved in case I think of something.
 
 
- -- Consider this function, runMaybeMap, to be a precursor to Layer addition of BoundedMaps.
+ -- Consider this function, runMaybeMap, to be a precursor to Layer addition of SectorMaps.
  runMaybeMap :: MapT Maybe a -> a -> PlanarCoordinate -> a
  runMaybeMap m failval = runMap . MapT $ \p ->
    case runMapT m p of
