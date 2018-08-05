@@ -15,7 +15,7 @@ xyrToSector (XYR x y r) = Sector (Planar (x - r) (y + r)) (Planar (x + r) (y - r
 
 mandelbrot :: Complex Double -> Complex Double -> Int -> Bool
 mandelbrot z _ _ | (sqr $ realPart z) + (sqr $ imagPart z) > 4 = False where sqr a = a * a
-mandelbrot _ _ i | i <= 0 = True
+mandelbrot _ _ 0 = True
 mandelbrot z c i = mandelbrot (z*z + c) c (i - 1)
 
 mandelmap' :: Int -> XYR -> Resolution -> RGBMap

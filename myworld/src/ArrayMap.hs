@@ -16,4 +16,4 @@ runArrayMap = runBoundedMap
 fromArray :: U.Unbox a => Array U DIM2 a -> ArrayMap a
 fromArray arr =
   let (Z :. a :. b) = extent arr
-  in fromMap (MapT $ \(Planar x y) -> return $ arr ! Z :. (floor x) :. (floor y)) (resToSector $ Resolution a b)
+  in fromMap (MapT $ \(Planar x y) -> return $ arr ! (Z :. floor x :. floor y)) (resToSector $ Resolution a b)

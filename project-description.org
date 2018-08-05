@@ -289,7 +289,7 @@
      fromArray :: U.Unbox a => Array U DIM2 a -> ArrayMap a
      fromArray arr =
        let (Z :. a :. b) = extent arr
-       in fromMap (MapT $ \(Planar x y) -> return $ arr ! Z :. (floor x) :. (floor y)) (resToSector $ Resolution a b)
+       in fromMap (MapT $ \(Planar x y) -> return $ arr ! (Z :. floor x :. floor y)) (resToSector $ Resolution a b)
    #+END_SRC
 ** TODO Maps to Images
    #+BEGIN_SRC haskell :tangle ./myworld/src/Resolution.hs
@@ -412,7 +412,7 @@
 
      mandelbrot :: Complex Double -> Complex Double -> Int -> Bool
      mandelbrot z _ _ | (sqr $ realPart z) + (sqr $ imagPart z) > 4 = False where sqr a = a * a
-     mandelbrot _ _ i | i <= 0 = True
+     mandelbrot _ _ 0 = True
      mandelbrot z c i = mandelbrot (z*z + c) c (i - 1)
 
      mandelmap' :: Int -> XYR -> Resolution -> RGBMap
