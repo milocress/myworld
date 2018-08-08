@@ -22,6 +22,16 @@ bot >>> top = MapT $ \p ->
     Nothing -> runMapT bot p
     Just x  -> pure x
 
+-- Note that the below code will not work, because monadic binding
+-- (>>=) doesn't allow a monad transformer to change the underlying
+-- monad.
+-- (>>>) :: (Applicative m) => MapT m a -> SectorMap a -> MapT m a
+-- bot >>> top = do
+--   v <- top
+--   case v of
+--     Nothing -> bot
+--     Just x -> pure x
+
 fromMap :: Map a -> Sector -> SectorMap a
 fromMap m s = MapT $ \p ->
   if inSector s p

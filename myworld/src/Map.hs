@@ -32,6 +32,9 @@ instance (Applicative m, Num a) => Num (MapT m a) where
   signum a = signum <$> a
   fromInteger = pure . fromInteger
 
+instance Transformable (MapT m a) where
+  transform x t = MapT $ \p -> runMapT x $ transform p t
+
 instance MonadTrans MapT where
   lift = MapT . const
 

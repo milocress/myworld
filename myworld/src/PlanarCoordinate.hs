@@ -38,6 +38,9 @@ class Transformable a where
 instance Transformable Sector where
   transform (Sector tl br) t = Sector (runTransform t tl) (runTransform t br)
 
+instance Transformable PlanarCoordinate where
+  transform p t = runTransform t p
+
 scale :: Scalar -> Transform
 scale a = Transform $ \(Planar x y) -> Planar (x * a) (y * a)
 
