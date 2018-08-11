@@ -7,6 +7,7 @@ import PlanarCoordinate
 import RGBMap
 import RepaExamples
 import Resolution
+import SectorMapExamples
 
 file :: String
 file = "./map.png"
@@ -22,7 +23,7 @@ main = do
       w = read $ args !! 4
       h = read $ args !! 5
       f = args !! 6
-    in saveMandelimg f n (XYR x y r) (Resolution w h)
+    in saveWierdLookingMap f n (XYR x y r) (Resolution w h)
 -- X = -0.16
 -- Y = 1.0405
 -- R = 0.026

@@ -36,3 +36,6 @@ white' = (255, 255, 255)
 
 saveMandelimg :: String -> Int -> XYR -> Resolution -> IO ()
 saveMandelimg fp n xyr r = savePngImage fp . ImageRGB8 $ fromRGBMap (mandelmap' n xyr r) r
+
+gradient' :: RGBMap
+gradient' = MapT $ \(Planar x y) -> return $ ((mod (floor x) 255), (mod (floor y) 255), 255)

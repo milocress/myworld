@@ -40,3 +40,6 @@ fromMap m s = MapT $ \p ->
 
 toMap :: SectorMap a -> a -> Map a
 toMap m failval = return failval >>> m
+
+emptySectorMap :: SectorMap a
+emptySectorMap = MapT $ \_ -> Nothing
