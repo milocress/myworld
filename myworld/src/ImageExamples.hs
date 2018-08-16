@@ -8,14 +8,14 @@ import Codec.Picture
 import Data.Complex
 
 gradient :: PixelMap
-gradient = MapT $ \(Planar x y) -> return $ PixelRGB8 (mod (floor x) 255) (mod (floor y) 255) 255
+gradient = MapT $ \(x, y) -> return $ PixelRGB8 (mod (floor x) 255) (mod (floor y) 255) 255
 
 m_mand :: PixelMap
-m_mand = mandelmap 1000 $ Transform $ \(Planar x y) -> Planar (x / 600 - 2) (y / 600 - (1080/1200))
+m_mand = mandelmap 1000 $ Transform $ \(x, y) -> (x / 600 - 2, y / 600 - (1080/1200))
 
 mandelmap :: Int -> Transform -> PixelMap
 mandelmap n xform = MapT $ \p -> return $
-  let (Planar x y) = runTransform xform p
+  let (x, y) = runTransform xform p
       z            = x :+ y
   in if mandelbrot z z n then black else white
   -- Note that this is the OLD way of creating an image, and is not considered best practice. For modern

@@ -7,5 +7,5 @@ data Resolution = Resolution { image_width  :: Int
 
 resToSector :: Resolution -> Sector
 resToSector (Resolution x y) = Sector
-                               (Planar 0 (fromIntegral y))
-                               (Planar (fromIntegral x) 0)
+                               (0, fromIntegral y)
+                               (fromIntegral x, 0)

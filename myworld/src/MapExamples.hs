@@ -22,7 +22,7 @@
 
  bumpyMap :: MaybeHeightmap
  bumpyMap = MapT $ \case
-   Planar x y -> Just $ sin x * cos y
+   (x, y) -> Just $ sin x * cos y
 
  -- DEPRECATED:
  -- Note that since bumpyMap works around the Maybe monad, it's possible for the function to fail, such as when
@@ -33,7 +33,7 @@
 
  bumpyMap' :: MaybeHeightmap'
  bumpyMap' = MapT $ \case
-   Planar x y -> Right $ sin x * cos y
+   (x, y) -> Right $ sin x * cos y
 -- _          -> Left "Spherical coordinates not supported"
    -- Since the most recent revision (at time of writing), spherical coordinates are a different data type than planar coordinates.
    -- This code remains because it is a good example of the use of various underlying monads for Maps.

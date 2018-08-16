@@ -22,7 +22,7 @@ unboxArr = runIdentity . computeUnboxedP
 
 fromMapToArr :: RGBMap -> Resolution -> Array D DIM2 RGB8
 fromMapToArr m (Resolution w h) = fromFunction (Z :. w :. h) $ \(Z :. x :. y) ->
-  runMap m $ Planar (fromIntegral x) (fromIntegral y)
+  runMap m $ (fromIntegral x, fromIntegral y)
 
 fromArrToImg :: Array U DIM2 RGB8 -> Image PixelRGB8
 fromArrToImg a =

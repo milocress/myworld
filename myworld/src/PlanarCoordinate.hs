@@ -1,17 +1,21 @@
+{-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE FlexibleInstances    #-}
 module PlanarCoordinate where
 
 type Scalar = Double
 
-data PlanarCoordinate = Planar { x_coord :: Scalar
-                               , y_coord :: Scalar } deriving (Show)
+type PlanarCoordinate = (Scalar, Scalar)
+x_coord, y_coord :: PlanarCoordinate -> Scalar
+x_coord = fst
+y_coord = snd
 
 instance Num PlanarCoordinate where
-  (Planar a b) + (Planar c d) = Planar (a + c) (b + d)
-  (Planar a b) * (Planar c d) = Planar (a * c) (b * d)
-  abs (Planar a b) = Planar (abs a) (abs b)
-  signum (Planar a b) = Planar (signum a) (signum b)
-  fromInteger a = Planar (fromInteger a) 0
-  negate (Planar a b) = Planar (-a) (-b)
+  (a, b) + (c, d) = (a + c, b + d)
+  (a, b) * (c, d) = (a * c, b * d)
+  abs (a, b)      = (abs a, abs b)
+  signum (a, b)   = (signum a, signum b)
+  fromInteger a   = (fromInteger a, 0)
+  negate (a, b)   = (-a, -b)
 
 newtype Transform = Transform { runTransform :: PlanarCoordinate -> PlanarCoordinate }
 
@@ -19,7 +23,7 @@ data Sector = Sector { top_left     :: PlanarCoordinate
                      , bottom_right :: PlanarCoordinate } deriving (Show)
 
 inSector :: Sector -> PlanarCoordinate -> Bool
-inSector (Sector (Planar a b) (Planar c d)) (Planar x y) =
+inSector (Sector (a, b) (c, d)) (x, y) =
   between_inclusive a c x &&
   between_inclusive d b y
 
@@ -27,10 +31,10 @@ between_inclusive :: Scalar -> Scalar -> Scalar -> Bool
 between_inclusive bot top x = x >= bot && x <= top
 
 width :: Sector -> Scalar
-width (Sector (Planar a _) (Planar b _)) = b - a
+width (Sector (a, _) (b, _)) = b - a
 
 height :: Sector -> Scalar
-height (Sector (Planar a _) (Planar b _)) = b - a
+height (Sector (a, _) (b, _)) = b - a
 
 class Transformable a where
   transform :: a -> Transform -> a
@@ -42,10 +46,10 @@ instance Transformable PlanarCoordinate where
   transform p t = runTransform t p
 
 scale :: Scalar -> Transform
-scale a = Transform $ \(Planar x y) -> Planar (x * a) (y * a)
+scale a = Transform $ \(x, y) -> (x * a, y * a)
 
 translate :: PlanarCoordinate -> Transform
-translate (Planar a b) = Transform $ \(Planar x y) -> Planar (x + a) (y + b)
+translate (a, b) = Transform $ \(x, y) -> (x + a, y + b)
 
 mapCoordinates :: Sector -> Sector -> Transform
 mapCoordinates a@(Sector tl _) b@(Sector tl' _) =

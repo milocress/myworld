@@ -11,7 +11,7 @@ import Resolution
 
 data XYR = XYR { xyr_x :: Double, xyr_y :: Double, xyr_r :: Double }
 xyrToSector :: XYR -> Sector
-xyrToSector (XYR x y r) = Sector (Planar (x - r) (y + r)) (Planar (x + r) (y - r))
+xyrToSector (XYR x y r) = Sector (x - r, y + r) (x + r, y - r)
 
 mandelbrot :: Complex Double -> Complex Double -> Int -> Bool
 mandelbrot z _ _ | (sqr $ realPart z) + (sqr $ imagPart z) > 4 = False where sqr a = a * a
@@ -24,7 +24,7 @@ mandelmap' n xyr r =
       imgSector  = resToSector r
       xform      = mapCoordinates imgSector mandSector
   in  MapT $ \p -> return $
-    let (Planar x y) = runTransform xform p
+    let (x, y) = runTransform xform p
         z            = x :+ y
     in if mandelbrot z z n then black' else white'
 
@@ -38,4 +38,4 @@ saveMandelimg :: String -> Int -> XYR -> Resolution -> IO ()
 saveMandelimg fp n xyr r = savePngImage fp . ImageRGB8 $ fromRGBMap (mandelmap' n xyr r) r
 
 gradient' :: RGBMap
-gradient' = MapT $ \(Planar x y) -> return $ ((mod (floor x) 255), (mod (floor y) 255), 255)
+gradient' = MapT $ \(x, y) -> return $ ((mod (floor x) 255), (mod (floor y) 255), 255)
