@@ -1,7 +1,9 @@
 module Map where
-import PlanarCoordinate
 import Data.Functor.Identity
 import Control.Monad.Trans.Class
+
+import PlanarCoordinate
+import Transform
 
 newtype MapT m a = MapT { runMapT :: PlanarCoordinate -> m a }
 

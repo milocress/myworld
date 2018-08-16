@@ -23,7 +23,7 @@ main = do
       w = read $ args !! 4
       h = read $ args !! 5
       f = args !! 6
-    in saveWierdLookingMap f n (XYR x y r) (Resolution w h)
+    in savePngImage f . ImageRGB8 $ fromRGBMap 
 -- X = -0.16
 -- Y = 1.0405
 -- R = 0.026
