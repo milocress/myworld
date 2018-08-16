@@ -23,7 +23,7 @@ main = do
       w = read $ args !! 4
       h = read $ args !! 5
       f = args !! 6
-    in savePngImage f . ImageRGB8 $ fromRGBMap 
+    in savePngImage f $ wierdLookingImg n (XYR x y r) (Resolution w h)
 -- X = -0.16
 -- Y = 1.0405
 -- R = 0.026

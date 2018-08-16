@@ -14,8 +14,8 @@ type RGBMap = Map RGB8
 toPixel :: RGB8 -> PixelRGB8
 toPixel (r, g, b) = PixelRGB8 r g b
 
-fromRGBMap :: RGBMap -> Resolution -> Image PixelRGB8
-fromRGBMap  m r = fromArrToImg . unboxArr $ fromMapToArr m r
+fromRGBMap :: RGBMap -> Resolution -> DynamicImage
+fromRGBMap m r = ImageRGB8 . fromArrToImg . unboxArr $ fromMapToArr m r
 
 unboxArr :: Array D DIM2 RGB8 -> Array U DIM2 RGB8
 unboxArr = runIdentity . computeUnboxedP

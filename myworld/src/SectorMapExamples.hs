@@ -1,18 +1,16 @@
 module SectorMapExamples where
 
 import Codec.Picture
+import Control.Monad.Trans.Class
 
 import Map
 import SectorMap
 import RGBMap
 import RepaExamples
 import Resolution
+import Transform
 
-boundedMandelMap :: Int -> XYR -> Resolution -> SectorMap RGB8
-boundedMandelMap n xyr r = fromMap (mandelmap' n xyr r) $ resToSector (Resolution 1920 1080)
-
-wierdLookingMap :: Int -> XYR -> Resolution -> RGBMap
-wierdLookingMap n xyr r = gradient' >>> (boundedMandelMap n xyr r)
-
-saveWierdLookingMap :: String -> Int -> XYR -> Resolution -> IO ()
-saveWierdLookingMap fp n xyr r = savePngImage fp . ImageRGB8 $ fromRGBMap (wierdLookingMap n xyr r) r
+wierdLookingImg :: Int -> XYR -> Resolution -> DynamicImage
+wierdLookingImg n xyr r = fromRGBMap wierdLookingMap r where
+  xform                 = mapCoordinates (resToSector r) (xyrToSector xyr)
+  wierdLookingMap       = gradient >>> (fromMap (transform (mandelmap n) xform) $ resToSector (Resolution 1920 1080))

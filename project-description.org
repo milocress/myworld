@@ -151,38 +151,37 @@
       import Map
 
       -- This is a map which returns "Nothing" if a coordinate is out of bounds,
-      -- or "Just a" if a coordinate is in bounds.
+      -- or "Just a" if a coordinate is in bounds. (This was written as a precursor to the SectorMap).
       type MaybeHeightmap = MapT Maybe Height
 
       flatMap :: MaybeHeightmap
       flatMap = return 1.0
 
       -- The unit declaration above is synonymous with the following, but more readable (and therefore preferred):
-      -- flatMap = Map $ \_ -> Just 1.0
+      -- flatMap = MapT $ \_ -> Just 1.0
 
-      -- Any calls to getPointAttr of flatMap will return 1.0 -- this is the most basic and simple kind of map.
+      -- Any calls to runMapT of flatMap will return 1.0 -- this is one of the most basic and simple kinds of
+      -- MaybeHeightmaps.
       -- Ex:
-      -- getPointAttr flatMap $ Planar 1 2
-      -- getPointAttr flatMap $ Planar Infinity 0
+      -- runMapT flatMap (1, 2)
+      -- runMapT flatMap (Infinity, 0)
       -- As we can see, unit declarations don't sanity-check inputs, but don't need to. They can take any input.
-
       bumpyMap :: MaybeHeightmap
       bumpyMap = MapT $ \case
-        (x, y) -> Just $ sin x * cos y
+        (x, y) -> return $ sin x * cos y
 
       -- DEPRECATED:
       -- Note that since bumpyMap works around the Maybe monad, it's possible for the function to fail, such as when
       -- it's applied to a coordinate that is non-planar.
-      -- Richer monadic wrappers can result in more expressive error messages, such as (Left "spherical coordinates not
-      -- supported" -- a result of the Either monad).
+      -- Richer monadic wrappers can result in more expressive error messages, such as (Left "Coordinate out of 
+      -- bounds" -- a result of the Either monad).
       type MaybeHeightmap' = MapT (Either String) Height
 
       bumpyMap' :: MaybeHeightmap'
-      bumpyMap' = MapT $ \case
-        (x, y) -> Right $ sin x * cos y
-     -- _          -> Left "Spherical coordinates not supported"
-        -- Since the most recent revision (at time of writing), spherical coordinates are a different data type than planar coordinates.
-        -- This code remains because it is a good example of the use of various underlying monads for Maps.
+      bumpyMap' = MapT $ \p@(x, y) ->
+        if True -- Some condition
+        then Right 1.0
+        else Left "Coordinate out of bounds" -- TODO: This is a bad example, change me!
 
       -- Now, we can use monadic binding to compose maps! Yay!
       flatAndBumpy :: MaybeHeightmap
@@ -190,7 +189,7 @@
         h  <- flatMap
         h' <- bumpyMap
         return $ h + h'
-      -- This is remarkably compact syntax compared to a non-monadic style, and forms the basis for the implementation
+      -- This is compact syntax compared to a non-monadic style, and forms the basis for the implementation
       -- of the Num typeclass (the Num implementation has since been rewritten to use the more succinct Applicative
       -- syntax, but it is easy to imagine how Num could be written with monads).
 
@@ -208,12 +207,13 @@
       -- As a matter of fact, now that arithmetic is implemented for Maps, it's much simpler to define flatAndBumpy:
       flatAndBumpy' :: MaybeHeightmap
       flatAndBumpy' = flatMap + bumpyMap
+      -- Note 
 
       -- These expressions become even more powerful when used to transform types. For example, imagine that a
-      -- topographical map (hMap :: heightmap), a roughness map (rMap :: MapT Maybe Double), and a wetmap (wMap :: MapT
-      -- Maybe Bool) are to be displayed by a program as an image, using the red, green, and blue channels to indicate
-      -- elevation, roughness, and water distribution, respectively. A simple color library exists which has the type
-      -- constructor:
+      -- topographical map (hMap :: heightmap), a roughness map (rMap :: MapT Maybe Double), and a wetmap 
+      -- (wMap :: MapT Maybe Bool) are to be displayed by a program as an image, using the red, green, and blue 
+      -- channels to indicate elevation, roughness, and water distribution, respectively. A simple color library 
+      -- exists which has the type constructor:
       -- RGB :: Double -> Double -> Double -> Color
       data Color = RGB { red :: Double, blue :: Double, green :: Double }
       -- In order to display the map, we need to convert the heightmap to a Color map.
@@ -230,16 +230,17 @@
       -- We can also use applicatives.
       toColorMap' :: Heightmap -> Map Double -> Map Bool -> Colormap
       toColorMap' hMap rMap wMap = RGB <$> hMap <*> rMap <*> fmap (\x -> if x then 1 else 0) wMap
-      -- While the monadic version is the more readable of the two (but not by a large margin), the applicative version
-      -- is far more succinct. At this point it's debatable which style to use. I believe that for calculations which
-      -- require a great deal of nested unwrapping, composition, and/or mapping, a monadic style is appropriate.
-      -- For simpler calculations (such as the one above) which are more a matter of applying a function to the value
-      -- contained by a monad rather than to the monad itself (with minimal nesting such as the if-else block), the
-      -- applicative style is cleaner.
+      -- While the monadic version is the more readable of the two (but not by a large margin), the applicative
+      -- version is far more succinct. At this point it's debatable which style to use. I believe that for 
+      -- calculations which require a great deal of nested unwrapping, composition, and/or mapping, a monadic style 
+      -- is appropriate. For simpler calculations (such as the one above) which are more a matter of applying a
+      -- function to the value contained by a monad rather than to the monad itself (with minimal nesting such as 
+      -- the if-else block), the applicative style is cleaner.
 
-      -- On the other hand, complex calculations, which "require a great deal of nested unwrapping, composition, and/or"
-      -- mapping, can be composed of simpler applicative-style functions. I'm honestly not sure what the monadic style is
-      -- useful for at this point, but it's implementation will be preserved in case I think of something.
+      -- On the other hand, complex calculations, which "require a great deal of nested unwrapping, composition,
+      -- and/or" mapping, can be composed of simpler applicative-style functions. I'm honestly not sure what the
+      -- monadic style is useful for at this point, but it's implementation will be preserved in case I think of
+      -- something.
 
 
       -- Consider this function, runMaybeMap, to be a precursor to Layer addition of SectorMaps.
@@ -249,9 +250,9 @@
           Just x  -> return x
           Nothing -> return failval
 
-      -- Another nice thing is that we can implement custom logic to change the underlying monad of a MapT (or map for
-      -- that matter) (See above)
-
+      -- Note that now, using SectorMap operators, the above expression could be simplified to:
+      -- runMaybeMap m failval = runMap (return failval >>> m)
+      -- When SectorTrees come into play, complex but readable layering of maps becomes more important.
    #+END_SRC
 
 ** Bounded Maps (SectorMaps)
@@ -307,21 +308,19 @@
      module SectorMapExamples where
 
      import Codec.Picture
+     import Control.Monad.Trans.Class
 
      import Map
      import SectorMap
      import RGBMap
      import RepaExamples
      import Resolution
+     import Transform
 
-     boundedMandelMap :: Int -> XYR -> Resolution -> SectorMap RGB8
-     boundedMandelMap n xyr r = fromMap (mandelmap' n xyr r) $ resToSector (Resolution 1920 1080)
-
-     wierdLookingMap :: Int -> XYR -> Resolution -> RGBMap
-     wierdLookingMap n xyr r = gradient' >>> (boundedMandelMap n xyr r)
-
-     saveWierdLookingMap :: String -> Int -> XYR -> Resolution -> IO ()
-     saveWierdLookingMap fp n xyr r = savePngImage fp . ImageRGB8 $ fromRGBMap (wierdLookingMap n xyr r) r
+     wierdLookingImg :: Int -> XYR -> Resolution -> DynamicImage
+     wierdLookingImg n xyr r = fromRGBMap wierdLookingMap r where
+       xform                 = mapCoordinates (resToSector r) (xyrToSector xyr)
+       wierdLookingMap       = gradient >>> (fromMap (transform (mandelmap n) xform) $ resToSector (Resolution 1920 1080))
    #+END_SRC
 ** ArrayMaps
    #+BEGIN_SRC haskell :tangle ./myworld/src/ArrayMap.hs
@@ -422,7 +421,7 @@
      white = PixelRGB8 255 255 255
    #+END_SRC
 ** Repa
-   Repa is a parallel processing data storage library ideal for converting Maps to (Repa) Arrays to (JuicyPixels) Images.
+   Repa is a parallel processing data storage library ideal for converting Maps to (Repa) Arrays to (JuicyPixels) Images. [[http://hackage.haskell.org/package/repa][More info on Repa.]]
    #+BEGIN_SRC haskell :tangle ./myworld/src/RGBMap.hs
      module RGBMap where
 
@@ -440,8 +439,8 @@
      toPixel :: RGB8 -> PixelRGB8
      toPixel (r, g, b) = PixelRGB8 r g b
 
-     fromRGBMap :: RGBMap -> Resolution -> Image PixelRGB8
-     fromRGBMap  m r = fromArrToImg . unboxArr $ fromMapToArr m r
+     fromRGBMap :: RGBMap -> Resolution -> DynamicImage
+     fromRGBMap m r = ImageRGB8 . fromArrToImg . unboxArr $ fromMapToArr m r
 
      unboxArr :: Array D DIM2 RGB8 -> Array U DIM2 RGB8
      unboxArr = runIdentity . computeUnboxedP
@@ -467,25 +466,31 @@
      import Map
      import PlanarCoordinate
      import Resolution
+     import Transform
 
      mandelbrot :: Complex Double -> Complex Double -> Int -> Bool
      mandelbrot z _ _ | (sqr $ realPart z) + (sqr $ imagPart z) > 4 = False where sqr a = a * a
      mandelbrot _ _ 0 = True
      mandelbrot z c i = mandelbrot (z*z + c) c (i - 1)
 
-     mandelmap :: Int -> XYR -> Resolution -> RGBMap
+     mandelmap :: Int -> RGBMap
      mandelmap n = MapT $ \(x, y) -> return $
        let z   = x :+ y
-       in if mandelbrot z z n then black' else white'
+       in if mandelbrot z z n then black else white
 
-     black' :: RGB8
-     black' = (0, 0, 0)
+     black :: RGB8
+     black = (0, 0, 0)
 
-     white' :: RGB8
-     white' = (255, 255, 255)
+     white :: RGB8
+     white = (255, 255, 255)
 
      gradient :: RGBMap
-     gradient = MapT $ \(x, y) -> return $ ((mod (floor x) 255), (mod (floor y) 255), 255)
+     gradient = MapT $ \(x, y) -> return $ ((mod (floor x) 255), (mod (floor y) 255), 128)
+
+     mandelImg :: Int -> XYR -> Resolution -> DynamicImage
+     mandelImg n xyr r = fromRGBMap mandelmap' r where
+       xform      = mapCoordinates (resToSector r) (xyrToSector xyr)
+       mandelmap' = transform (mandelmap n) xform
    #+END_SRC
 ** Sector Tree
    Implementation of a =SectorTree=, along with code that divides sectors into smaller child sectors, as well as control code that decides how/when to expand or prune branches of the sector tree.
@@ -538,8 +543,8 @@
      stack build
    #+END_SRC
    Examples: 
-   - =stack exec myworld-exe 0.29 0.015 0.00095 300 7680 4320 elephants.png=
-   - =stack exec myworld-exe -0.7443 0.109 0.005 250 7680 4320 spirals.png=
+   - =stack exec -- myworld-exe 0.29 0.015 0.00095 300 7680 4320 elephants.png=
+   - =stack exec -- myworld-exe -0.7443 0.109 0.005 250 7680 4320 spirals.png=
 
    #+BEGIN_SRC haskell :tangle ./myworld/app/Main.hs
      module Main where
@@ -567,7 +572,7 @@
            w = read $ args !! 4
            h = read $ args !! 5
            f = args !! 6
-         in savePngImage f . ImageRGB8 $ fromRGBMap 
+         in savePngImage f $ wierdLookingImg n (XYR x y r) (Resolution w h)
      -- X = -0.16
      -- Y = 1.0405
      -- R = 0.026
