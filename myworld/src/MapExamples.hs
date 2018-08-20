@@ -1,4 +1,3 @@
-{-# LANGUAGE LambdaCase #-}
 module MapExamples where
 
 import PlanarCoordinate
@@ -21,8 +20,7 @@ flatMap = return 1.0
 -- runMapT flatMap (Infinity, 0)
 -- As we can see, unit declarations don't sanity-check inputs, but don't need to. They can take any input.
 bumpyMap :: MaybeHeightmap
-bumpyMap = MapT $ \case
-  (x, y) -> return $ sin x * cos y
+bumpyMap = MapT $ \(x, y) -> return $ sin x * cos y
 
 -- DEPRECATED:
 -- Note that since bumpyMap works around the Maybe monad, it's possible for the function to fail, such as when

@@ -27,6 +27,7 @@ dependencies:
 - repa
 - JuicyPixels
 - vector
+- gloss
 
 library:
   source-dirs: src

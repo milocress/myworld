@@ -7,6 +7,7 @@ import Data.Functor.Foldable
 import Map
 import SectorMap
 import PlanarCoordinate
+import ShapeMap
 
 -- type SectorFunc a = (forall m . MapT m a -> SectorTree a)
 type SectorFunc a = SectorMap a -> SectorMap a
@@ -31,7 +32,7 @@ compileSectorTree :: SectorTree a -> SectorMap a
 compileSectorTree t = (cata alg t) emptySectorMap where
   alg (SectorNodeF f fs) = foldr (.) f fs
 
-type SectorSeed = (Sector, Map Double)
+type SectorSeed = (Sector, ShapeMap)
 
 buildSectorTree :: (Sector -> SectorFunc a) -> SectorSeed -> SectorTree a
 buildSectorTree f t = ana coalg t where
