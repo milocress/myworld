@@ -1,5 +1,8 @@
 module SectorMap where
 
+import Data.Functor.Identity
+import Control.Applicative
+
 import Map
 import PlanarCoordinate
 
@@ -8,12 +11,17 @@ type SectorMap a = MapT Maybe a
 runSectorMap :: SectorMap a -> PlanarCoordinate -> Maybe a
 runSectorMap = runMapT
 
+
+instance Alternative Identity where
+  (<|>) = const
+  empty = undefined
+
 -- Non-strict Map addition
-(<+>) :: (Functor m, Num a) => MapT m a -> SectorMap a -> MapT m a
+(<+>) :: (Alternative m, Num a) => MapT m a -> SectorMap a -> MapT m a
 bot <+> top = MapT $ \p ->
   case runSectorMap top p of
     Nothing -> runMapT bot p
-    Just x  -> (+x) <$> runMapT bot p
+    Just x  -> (+x) <$> runMapT bot p <|> pure x
 
 -- Non-strict Map overlaying
 (>>>) :: (Applicative m) => MapT m a -> SectorMap a -> MapT m a

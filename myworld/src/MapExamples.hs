@@ -107,3 +107,4 @@ runMaybeMap m failval = runMap . MapT $ \p ->
 -- Note that now, using SectorMap operators, the above expression could be simplified to:
 -- runMaybeMap m failval = runMap (return failval >>> m)
 -- When SectorTrees come into play, complex but readable layering of maps becomes more important.
+-- For more information on this, as well as implementations, see SectorTree.hs

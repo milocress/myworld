@@ -41,6 +41,10 @@
      data Sector = Sector { top_left     :: PlanarCoordinate
                           , bottom_right :: PlanarCoordinate } deriving (Show)
 
+     top_right, bottom_left :: Sector -> PlanarCoordinate
+     top_right   (Sector (_, b) (c, _)) = (b, c)
+     bottom_left (Sector (a, _) (_, d)) = (a, d)
+
      inSector :: Sector -> PlanarCoordinate -> Bool
      inSector (Sector (a, b) (c, d)) (x, y) =
        between_inclusive a c x &&
@@ -50,10 +54,26 @@
      between_inclusive bot top x = x >= bot && x <= top
 
      width :: Sector -> Scalar
-     width (Sector (a, _) (b, _)) = b - a
+     width (Sector (a, _) (b, _)) = abs $ b - a
 
      height :: Sector -> Scalar
-     height (Sector (a, _) (b, _)) = b - a
+     height (Sector (a, _) (b, _)) = abs $ b - a
+
+     midpoint :: PlanarCoordinate -> PlanarCoordinate -> PlanarCoordinate
+     midpoint (a, b) (c, d) = ((a + c)/2, (b + d)/2)
+
+     subdivideSector :: Sector -> [Sector]
+     subdivideSector s@(Sector tl br) = [ Sector tl mp
+                                        , Sector mp br
+                                        , Sector tm mr
+                                        , Sector ml bm] where
+       tr = top_right   s
+       bl = bottom_left s
+       mp = midpoint tl br
+       tm = midpoint tl tr
+       mr = midpoint tr br
+       ml = midpoint tl bl
+       bm = midpoint bl br
    #+END_SRC
 
    #+BEGIN_SRC haskell :tangle ./myworld/src/Transform.hs
@@ -253,11 +273,15 @@
       -- Note that now, using SectorMap operators, the above expression could be simplified to:
       -- runMaybeMap m failval = runMap (return failval >>> m)
       -- When SectorTrees come into play, complex but readable layering of maps becomes more important.
+      -- For more information on this, as well as implementations, see SectorTree.hs
    #+END_SRC
 
 ** Bounded Maps (SectorMaps)
    #+BEGIN_SRC haskell :tangle ./myworld/src/SectorMap.hs
      module SectorMap where
+
+     import Data.Functor.Identity
+     import Control.Applicative
 
      import Map
      import PlanarCoordinate
@@ -267,12 +291,17 @@
      runSectorMap :: SectorMap a -> PlanarCoordinate -> Maybe a
      runSectorMap = runMapT
 
+     
+     instance Alternative Identity where
+       (<|>) = const
+       empty = undefined
+
      -- Non-strict Map addition
-     (<+>) :: (Functor m, Num a) => MapT m a -> SectorMap a -> MapT m a
+     (<+>) :: (Alternative m, Num a) => MapT m a -> SectorMap a -> MapT m a
      bot <+> top = MapT $ \p ->
        case runSectorMap top p of
          Nothing -> runMapT bot p
-         Just x  -> (+x) <$> runMapT bot p
+         Just x  -> (+x) <$> runMapT bot p <|> pure x
 
      -- Non-strict Map overlaying
      (>>>) :: (Applicative m) => MapT m a -> SectorMap a -> MapT m a
@@ -496,11 +525,14 @@
    Implementation of a =SectorTree=, along with code that divides sectors into smaller child sectors, as well as control code that decides how/when to expand or prune branches of the sector tree.
    #+BEGIN_SRC haskell :tangle ./myworld/src/SectorTree.hs
      {-# LANGUAGE DeriveFunctor #-}
+     -- {-# LANGUAGE FlexibleContexts #-}
      module SectorTree where
 
      import Data.Functor.Foldable
 
+     import Map
      import SectorMap
+     import PlanarCoordinate
 
      -- type SectorFunc a = (forall m . MapT m a -> SectorTree a)
      type SectorFunc a = SectorMap a -> SectorMap a
@@ -523,7 +555,19 @@
 
      compileSectorTree :: SectorTree a -> SectorMap a
      compileSectorTree t = (cata alg t) emptySectorMap where
-       alg (SectorNodeF f fs) = foldr (\x acc -> x . acc) f fs
+       alg (SectorNodeF f fs) = foldr (.) f fs
+
+     type SectorSeed = (Sector, Map Double)
+
+     buildSectorTree :: (Sector -> SectorFunc a) -> SectorSeed -> SectorTree a
+     buildSectorTree f t = ana coalg t where
+       coalg (s@(Sector tl br), m) =
+         let
+         children =
+           if (runMap m (midpoint tl br) > 0)
+           then (map (\s' -> (s', m - return 1)) $ subdivideSector s)
+           else []
+         in SectorNodeF (f s) children
    #+END_SRC
 
    #+BEGIN_SRC haskell :tangle ./myworld/src/SectorTreeExamples.hs
