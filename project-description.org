@@ -11,9 +11,9 @@
 #+EXCLUDE_TAGS: noexport
 #+CREATOR: Emacs 26.1 (Org mode 9.1.6)
 
-* TODO Problem
+* Problem
   As computer graphics advance in processing power, the visual detail that graphics processors can render also increases, requiring a larger amount of data to render. The goal of this project is to explore on-the-fly creation of 3-dimensional rendering data, which would limit the amount of data required to render a scene by generating visually relevant areas at a higher level of detail than non-visually relevant areas. While traditional models are stored at a consistent level of detail throughout the scene, this project attempts to create models that comprise only a fraction of the scene, but relative to the viewer, appear to comprise the entire scene.
-* TODO Solution Prototype
+* Solution Prototype
 ** Description
   This project uses procedural terrain generation that functions on a variety of spatial and temporal scales, at a realistic level of detail. It is divided into two parts: the sector event buffer, and the Sector Tree.
   Implementation of procedural terrain generation with fixed geometries and Levels of Detail, as well as simulation of natural events such as erosion, continental drift, etc.
@@ -337,24 +337,6 @@
      emptySectorMap = MapT $ \_ -> Nothing
    #+END_SRC
 
-   #+BEGIN_SRC haskell :tangle ./myworld/src/SectorMapExamples.hs
-     module SectorMapExamples where
-
-     import Codec.Picture
-     import Control.Monad.Trans.Class
-
-     import Map
-     import SectorMap
-     import RGBMap
-     import RepaExamples
-     import Resolution
-     import Transform
-
-     wierdLookingImg :: Int -> XYR -> Resolution -> DynamicImage
-     wierdLookingImg n xyr r = fromRGBMap wierdLookingMap r where
-       xform                 = mapCoordinates (resToSector r) (xyrToSector xyr)
-       wierdLookingMap       = gradient >>> (fromMap (transform (mandelmap n) xform) $ resToSector (Resolution 1920 1080))
-   #+END_SRC
 ** ArrayMaps
    #+BEGIN_SRC haskell :tangle ./myworld/src/ArrayMap.hs
      module ArrayMap where
@@ -488,6 +470,132 @@
        in generateImage (\x y -> toPixel $ a ! (Z :. x :. y)) w h
    #+END_SRC
 
+** Sector Trees
+   #+BEGIN_SRC haskell :tangle ./myworld/src/SectorTree.hs
+     {-# LANGUAGE DeriveFunctor #-}
+     -- {-# LANGUAGE FlexibleContexts #-}
+     module SectorTree where
+
+     import Data.Functor.Foldable
+
+     import Map
+     import SectorMap
+     import PlanarCoordinate
+     import ShapeMap
+
+     -- type SectorFunc a = (forall m . MapT m a -> SectorTree a)
+     type SectorFunc a = SectorMap a -> SectorMap a
+
+     data SectorTreeF a r = SectorNodeF (SectorFunc a) [r]
+                          deriving (Functor)
+
+     type SectorTree a = Fix (SectorTreeF a)
+
+     {-
+     bigMap :: SectorMap a
+     littleMap :: SectorMap a
+     bigMap >>> littleMap :: SectorMap a
+     (>>> littleMap) :: SectorMap a -> SectorMap a
+     f = (>>> littleMap)
+     g = (<+> teensyMap)
+     f . g     = (<+> teensyMap) (>>> littleMap)
+     (f . g) x = (x <+> teensyMap) >>> littleMap
+     -}
+
+     compileSectorTree :: SectorTree a -> SectorMap a
+     compileSectorTree t = (cata alg t) emptySectorMap where
+       alg (SectorNodeF f fs) = foldr (.) f fs
+
+     type SectorSeed = (Sector, ShapeMap, Int) -- The Double is Recursion Depth
+
+     buildSectorTree :: (SectorSeed -> SectorFunc a) -> SectorSeed -> SectorTree a
+     buildSectorTree f t = ana coalg t where
+       coalg seed@(s@(Sector tl br), m, d) =
+         let
+         children =
+           if (runMap m (midpoint tl br) > 0)
+           then (map (\s' -> (s', (subtract 1) <$> m, d + 1)) $ subdivideSector s)
+           else []
+         in SectorNodeF (f seed) children
+   #+END_SRC
+
+** SectorTree ShapeMaps
+   #+BEGIN_SRC haskell :tangle ./myworld/src/ShapeMap.hs
+     module ShapeMap where
+
+     import Map
+     import Transform
+     import PlanarCoordinate
+
+     type ShapeMap = Map Double
+
+     buildShapeMap :: Sector -> PlanarCoordinate -> Int -> ShapeMap
+     buildShapeMap s p n = transform (MapT $ \q ->
+       let x = (-1) * logBase 2 (distance p q)
+       in return $ min (fromIntegral n) x) (mapCoordinates s $ Sector (-1, 1) (1, -1))
+   #+END_SRC
+
+** Stack Setup
+   Installation: 
+   #+BEGIN_SRC bash
+     git clone https://github.com/zephyrys/myworld.git
+     stack build
+   #+END_SRC
+   Examples: 
+   - =stack exec -- myworld-exe 0.29 0.015 0.00095 300 7680 4320 elephants.png=
+   - =stack exec -- myworld-exe -0.7443 0.109 0.005 250 7680 4320 spirals.png=
+
+   #+BEGIN_SRC haskell :tangle ./myworld/app/Main.hs
+     module Main where
+
+     import MandelMain
+     import GLMain
+
+     main :: IO ()
+     main = mandelMain
+   #+END_SRC
+
+** Testing Suite
+   #+BEGIN_SRC haskell :tangle ./myworld/test/Spec.hs
+     main :: IO ()
+     main = putStrLn "Test suite not yet implemented"
+   #+END_SRC
+
+* Demos
+** Mandelbrot Set Map/Image Demo
+
+   #+BEGIN_SRC haskell :tangle ./myworld/src/MandelMain.hs
+     module MandelMain where
+
+     import Codec.Picture
+     import System.Environment
+
+     import PlanarCoordinate
+     import RGBMap
+     import RepaExamples
+     import Resolution
+     import SectorMapExamples
+     import ShapeMapExamples
+
+     file :: String
+     file = "./map.png"
+
+     mandelMain :: IO ()
+     mandelMain = do
+       args <- getArgs
+       let x = read $ args !! 0
+           y = read $ args !! 1
+           r = read $ args !! 2
+           n = read $ args !! 3
+           w = read $ args !! 4
+           h = read $ args !! 5
+           f = args !! 6
+         in savePngImage f $ lowPolyMandelImg n (XYR x y r) (Resolution w h)
+     -- X = -0.16
+     -- Y = 1.0405
+     -- R = 0.026
+   #+END_SRC
+
    #+BEGIN_SRC haskell :tangle ./myworld/src/RepaExamples.hs
      module RepaExamples where
 
@@ -525,139 +633,61 @@
        xform      = mapCoordinates (resToSector r) (xyrToSector xyr)
        mandelmap' = transform (mandelmap n) xform
    #+END_SRC
-** Sector Tree
-   Implementation of a =SectorTree=, along with code that divides sectors into smaller child sectors, as well as control code that decides how/when to expand or prune branches of the sector tree.
-   #+BEGIN_SRC haskell :tangle ./myworld/src/SectorTree.hs
-     {-# LANGUAGE DeriveFunctor #-}
-     -- {-# LANGUAGE FlexibleContexts #-}
-     module SectorTree where
 
-     import Data.Functor.Foldable
+   #+BEGIN_SRC haskell :tangle ./myworld/src/SectorMapExamples.hs
+     module SectorMapExamples where
+
+     import Codec.Picture
+     import Control.Monad.Trans.Class
 
      import Map
      import SectorMap
-     import PlanarCoordinate
-     import ShapeMap
-
-     -- type SectorFunc a = (forall m . MapT m a -> SectorTree a)
-     type SectorFunc a = SectorMap a -> SectorMap a
-
-     data SectorTreeF a r = SectorNodeF (SectorFunc a) [r]
-                          deriving (Functor)
-
-     type SectorTree a = Fix (SectorTreeF a)
-
-     {-
-     bigMap :: SectorMap a
-     littleMap :: SectorMap a
-     bigMap >>> littleMap :: SectorMap a
-     (>>> littleMap) :: SectorMap a -> SectorMap a
-     f = (>>> littleMap)
-     g = (<+> teensyMap)
-     f . g     = (<+> teensyMap) (>>> littleMap)
-     (f . g) x = (x <+> teensyMap) >>> littleMap
-     -}
-
-     compileSectorTree :: SectorTree a -> SectorMap a
-     compileSectorTree t = (cata alg t) emptySectorMap where
-       alg (SectorNodeF f fs) = foldr (.) f fs
-
-     type SectorSeed = (Sector, ShapeMap)
-
-     buildSectorTree :: (Sector -> SectorFunc a) -> SectorSeed -> SectorTree a
-     buildSectorTree f t = ana coalg t where
-       coalg (s@(Sector tl br), m) =
-         let
-         children =
-           if (runMap m (midpoint tl br) > 0)
-           then (map (\s' -> (s', m - return 1)) $ subdivideSector s)
-           else []
-         in SectorNodeF (f s) children
-   #+END_SRC
-
-   # #+BEGIN_SRC haskell :tangle ./myworld/src/SectorTreeExamples.hs
-   #   module SectorTreeExamples where
-
-   #   import Map
-   #   import PlanarCoordinate
-   #   import RepaExamples
-   #   import SectorTree
-
-
-   # #+END_SRC
-** SectorTree ShapeMaps
-   #+BEGIN_SRC haskell :tangle ./myworld/src/ShapeMap.hs
-     module ShapeMap where
-
-     import PlanarCoordinate
-     import Map
-
-     type ShapeMap = Map Double
-
-     buildShapeMap :: PlanarCoordinate -> ShapeMap
-     buildShapeMap p = MapT $ \q -> return $ logBase 2 (distance p q)
-   #+END_SRC
-
-** Stack Setup
-   Installation: 
-   #+BEGIN_SRC bash
-     git clone https://github.com/zephyrys/myworld.git
-     stack build
-   #+END_SRC
-   Examples: 
-   - =stack exec -- myworld-exe 0.29 0.015 0.00095 300 7680 4320 elephants.png=
-   - =stack exec -- myworld-exe -0.7443 0.109 0.005 250 7680 4320 spirals.png=
-
-   #+BEGIN_SRC haskell :tangle ./myworld/app/Main.hs
-     module Main where
-
-     import MandelMain
-     import GLMain
-
-     main :: IO ()
-     main = glMain
-   #+END_SRC
-
-** Testing Suite
-   #+BEGIN_SRC haskell :tangle ./myworld/test/Spec.hs
-     main :: IO ()
-     main = putStrLn "Test suite not yet implemented"
-   #+END_SRC
-
-* Demos
-** Mandelbrot Set Map/Image Demo
-
-   #+BEGIN_SRC haskell :tangle ./myworld/src/MandelMain.hs
-     module MandelMain where
-
-     import Codec.Picture
-     import System.Environment
-
-     import PlanarCoordinate
      import RGBMap
      import RepaExamples
      import Resolution
-     import SectorMapExamples
+     import Transform
 
-     file :: String
-     file = "./map.png"
-
-     mandelMain :: IO ()
-     mandelMain = do
-       args <- getArgs
-       let x = read $ args !! 0
-           y = read $ args !! 1
-           r = read $ args !! 2
-           n = read $ args !! 3
-           w = read $ args !! 4
-           h = read $ args !! 5
-           f = args !! 6
-         in savePngImage f $ mandelImg n (XYR x y r) (Resolution w h)
-     -- X = -0.16
-     -- Y = 1.0405
-     -- R = 0.026
+     wierdLookingImg :: Int -> XYR -> Resolution -> DynamicImage
+     wierdLookingImg n xyr r = fromRGBMap wierdLookingMap r where
+       xform                 = mapCoordinates (resToSector r) (xyrToSector xyr)
+       wierdLookingMap       = gradient >>> (fromMap (transform (mandelmap n) xform) $ resToSector (Resolution 1920 1080))
    #+END_SRC
 
+   #+BEGIN_SRC haskell :tangle ./myworld/src/ShapeMapExamples.hs
+     module ShapeMapExamples where
+
+     import Codec.Picture
+
+     import Map
+     import RGBMap
+     import ShapeMap
+     import Transform
+     import SectorMap
+     import Resolution
+     import SectorTree
+     import RepaExamples
+     import PlanarCoordinate
+     -- The imports are in order of length, just for fun.
+
+     sampleCenter :: Map a -> SectorSeed -> SectorFunc a
+     sampleCenter m (s@(Sector tl br), _, _) = \x -> x >>> (fromMap (return $ runMap m $ midpoint tl br) s)
+
+     invertColors :: SectorSeed -> SectorFunc RGB8
+     invertColors (s, _, d) = \x -> x >>> (fromMap (return $ if even d then black else white) s)
+
+     lowPolyMandelMap :: Int -> XYR -> RGBMap
+     lowPolyMandelMap n xyr@(XYR x y _) =
+       (return black) >>> (compileSectorTree $ buildSectorTree f (sec, shapeMap, 0)) where
+         f          = sampleCenter $ mandelmap 300
+         sec        = xyrToSector xyr
+         shapeMap   = return 12 -- (return 2) * (buildShapeMap sec focusPoint n)
+         focusPoint = (0.29, 0.015)
+
+     lowPolyMandelImg :: Int -> XYR -> Resolution -> DynamicImage
+     lowPolyMandelImg n xyr r = fromRGBMap lowPolyMandelMap' r where
+       xform             = mapCoordinates (resToSector r) (xyrToSector xyr)
+       lowPolyMandelMap' = transform (lowPolyMandelMap n xyr) xform
+   #+END_SRC
 ** OpenGL SectorTree Demo
    #+BEGIN_SRC haskell :tangle ./myworld/src/GLMain.hs
      module GLMain where

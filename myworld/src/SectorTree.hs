@@ -32,14 +32,14 @@ compileSectorTree :: SectorTree a -> SectorMap a
 compileSectorTree t = (cata alg t) emptySectorMap where
   alg (SectorNodeF f fs) = foldr (.) f fs
 
-type SectorSeed = (Sector, ShapeMap)
+type SectorSeed = (Sector, ShapeMap, Int) -- The Double is Recursion Depth
 
-buildSectorTree :: (Sector -> SectorFunc a) -> SectorSeed -> SectorTree a
+buildSectorTree :: (SectorSeed -> SectorFunc a) -> SectorSeed -> SectorTree a
 buildSectorTree f t = ana coalg t where
-  coalg (s@(Sector tl br), m) =
+  coalg seed@(s@(Sector tl br), m, d) =
     let
     children =
       if (runMap m (midpoint tl br) > 0)
-      then (map (\s' -> (s', m - return 1)) $ subdivideSector s)
+      then (map (\s' -> (s', (subtract 1) <$> m, d + 1)) $ subdivideSector s)
       else []
-    in SectorNodeF (f s) children
+    in SectorNodeF (f seed) children

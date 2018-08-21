@@ -4,4 +4,4 @@ import MandelMain
 import GLMain
 
 main :: IO ()
-main = glMain
+main = mandelMain
