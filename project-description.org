@@ -62,19 +62,12 @@
      midpoint :: PlanarCoordinate -> PlanarCoordinate -> PlanarCoordinate
      midpoint (a, b) (c, d) = ((a + c)/2, (b + d)/2)
 
-     -- Please, for the love of all that is holy (which in my opinion isn't much), change me!
-     subdivideSector :: Sector -> [Sector]
-     subdivideSector s@(Sector tl br) = [ Sector tl mm
-                                        , Sector mm br
-                                        , Sector tm mr
-                                        , Sector ml bm ] where
-       tr = top_right   s
-       bl = bottom_left s
-       mm = midpoint tl br
-       tm = midpoint tl tr
-       mr = midpoint tr br
-       ml = midpoint tl bl
-       bm = midpoint bl br
+     subdivideSector :: Sector -> Int -> [Sector]
+     subdivideSector (Sector (a,b) (c,d)) n = [ Sector (a', b') (a' + dx, b' + dy)
+                                              | a' <- init [a, a + dx .. c]
+                                              , b' <- init [b, b + dy .. d] ] where
+         dx = (c - a) / (fromIntegral n)
+         dy = (d - b) / (fromIntegral n)
 
      distance :: PlanarCoordinate -> PlanarCoordinate -> Scalar
      distance (a, b) (c, d) = sqrt $ x*x + y*y where
@@ -445,14 +438,21 @@
      import Data.Functor.Identity
 
      import Map
-     import PlanarCoordinate
+     import Transform
      import Resolution
+     import PlanarCoordinate
 
      type RGB8   = (Pixel8, Pixel8, Pixel8)
      type RGBMap = Map RGB8
 
      toPixel :: RGB8 -> PixelRGB8
      toPixel (r, g, b) = PixelRGB8 r g b
+     
+     toImg :: RGBMap -> XYR -> Resolution -> DynamicImage
+     toImg m xyr r = fromRGBMap m' r where
+       xform = mapCoordinates (resToSector r) (xyrToSector xyr)
+       m'    = transform m xform
+     
 
      fromRGBMap :: RGBMap -> Resolution -> DynamicImage
      fromRGBMap m r = ImageRGB8 . fromArrToImg . unboxArr $ fromMapToArr m r
@@ -502,20 +502,20 @@
      (f . g) x = (x <+> teensyMap) >>> littleMap
      -}
 
+     {-# INLINE compileSectorTree #-}
      compileSectorTree :: SectorTree a -> SectorMap a
      compileSectorTree t = (cata alg t) emptySectorMap where
        alg (SectorNodeF f fs) = foldr (.) f fs
 
      type SectorSeed = (Sector, ShapeMap, Int) -- The Double is Recursion Depth
 
+     {-# INLINE buildSectorTree #-}
      buildSectorTree :: (SectorSeed -> SectorFunc a) -> SectorSeed -> SectorTree a
      buildSectorTree f t = ana coalg t where
        coalg seed@(s@(Sector tl br), m, d) =
-         let
-         children =
-           if (runMap m (midpoint tl br) > 0)
-           then (map (\s' -> (s', (subtract 1) <$> m, d + 1)) $ subdivideSector s)
-           else []
+         let children = if (runMap m (midpoint tl br) >= 0)
+                        then (map (\s' -> (s', (subtract 1) <$> m, d + 1)) $ subdivideSector s 2)
+                        else []
          in SectorNodeF (f seed) children
    #+END_SRC
 
@@ -529,10 +529,10 @@
 
      type ShapeMap = Map Double
 
-     buildShapeMap :: Sector -> PlanarCoordinate -> Int -> ShapeMap
-     buildShapeMap s p n = transform (MapT $ \q ->
+     buildShapeMap :: PlanarCoordinate -> Int -> ShapeMap
+     buildShapeMap p n = MapT $ \q ->
        let x = (-1) * logBase 2 (distance p q)
-       in return $ min (fromIntegral n) x) (mapCoordinates s $ Sector (-1, 1) (1, -1))
+       in return $ min (fromIntegral n) x
    #+END_SRC
 
 ** Stack Setup
@@ -577,9 +577,6 @@
      import SectorMapExamples
      import ShapeMapExamples
 
-     file :: String
-     file = "./map.png"
-
      mandelMain :: IO ()
      mandelMain = do
        args <- getArgs
@@ -590,7 +587,9 @@
            w = read $ args !! 4
            h = read $ args !! 5
            f = args !! 6
-         in savePngImage f $ lowPolyMandelImg n (XYR x y r) (Resolution w h)
+         in do
+         savePngImage f $ lowPolyMandelImg n (XYR x y r) (Resolution w h)
+         savePngImage "shapeMap.png" $ shapeMapImg n (XYR x y r) (Resolution w h)
      -- X = -0.16
      -- Y = 1.0405
      -- R = 0.026
@@ -678,15 +677,23 @@
      lowPolyMandelMap :: Int -> XYR -> RGBMap
      lowPolyMandelMap n xyr@(XYR x y _) =
        (return black) >>> (compileSectorTree $ buildSectorTree f (sec, shapeMap, 0)) where
-         f          = sampleCenter $ mandelmap 300
+         f          = invertColors -- sampleCenter $ mandelmap 300
          sec        = xyrToSector xyr
-         shapeMap   = return 12 -- (return 2) * (buildShapeMap sec focusPoint n)
-         focusPoint = (0.29, 0.015)
+         shapeMap   = return 1 + (buildShapeMap focusPoint n)
+         focusPoint = (x, y)
 
      lowPolyMandelImg :: Int -> XYR -> Resolution -> DynamicImage
      lowPolyMandelImg n xyr r = fromRGBMap lowPolyMandelMap' r where
        xform             = mapCoordinates (resToSector r) (xyrToSector xyr)
        lowPolyMandelMap' = transform (lowPolyMandelMap n xyr) xform
+
+     shapeToRGB8 :: Int -> Double -> RGB8
+     shapeToRGB8 max x = (x', x', x') where x' = if x <= 0 then 0 else floor $ 255 * (x / (fromIntegral max))
+
+     shapeMapImg :: Int -> XYR -> Resolution -> DynamicImage
+     shapeMapImg n xyr@(XYR x y _) res = fromRGBMap shapeMap' res where
+       xform     = mapCoordinates (resToSector res) (xyrToSector xyr)
+       shapeMap' = transform (shapeToRGB8 n <$> (buildShapeMap (x, y) n)) xform
    #+END_SRC
 ** OpenGL SectorTree Demo
    #+BEGIN_SRC haskell :tangle ./myworld/src/GLMain.hs

@@ -22,12 +22,20 @@ invertColors (s, _, d) = \x -> x >>> (fromMap (return $ if even d then black els
 lowPolyMandelMap :: Int -> XYR -> RGBMap
 lowPolyMandelMap n xyr@(XYR x y _) =
   (return black) >>> (compileSectorTree $ buildSectorTree f (sec, shapeMap, 0)) where
-    f          = sampleCenter $ mandelmap 300
+    f          = invertColors -- sampleCenter $ mandelmap 300
     sec        = xyrToSector xyr
-    shapeMap   = return 12 -- (return 2) * (buildShapeMap sec focusPoint n)
-    focusPoint = (0.29, 0.015)
+    shapeMap   = return 1 + (buildShapeMap focusPoint n)
+    focusPoint = (x, y)
 
 lowPolyMandelImg :: Int -> XYR -> Resolution -> DynamicImage
 lowPolyMandelImg n xyr r = fromRGBMap lowPolyMandelMap' r where
   xform             = mapCoordinates (resToSector r) (xyrToSector xyr)
   lowPolyMandelMap' = transform (lowPolyMandelMap n xyr) xform
+
+shapeToRGB8 :: Int -> Double -> RGB8
+shapeToRGB8 max x = (x', x', x') where x' = if x <= 0 then 0 else floor $ 255 * (x / (fromIntegral max))
+
+shapeMapImg :: Int -> XYR -> Resolution -> DynamicImage
+shapeMapImg n xyr@(XYR x y _) res = fromRGBMap shapeMap' res where
+  xform     = mapCoordinates (resToSector res) (xyrToSector xyr)
+  shapeMap' = transform (shapeToRGB8 n <$> (buildShapeMap (x, y) n)) xform

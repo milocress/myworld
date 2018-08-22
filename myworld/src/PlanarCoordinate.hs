@@ -41,19 +41,12 @@ height (Sector (a, _) (b, _)) = abs $ b - a
 midpoint :: PlanarCoordinate -> PlanarCoordinate -> PlanarCoordinate
 midpoint (a, b) (c, d) = ((a + c)/2, (b + d)/2)
 
--- Please, for the love of all that is holy (which in my opinion isn't much), change me!
-subdivideSector :: Sector -> [Sector]
-subdivideSector s@(Sector tl br) = [ Sector tl mm
-                                   , Sector mm br
-                                   , Sector tm mr
-                                   , Sector ml bm ] where
-  tr = top_right   s
-  bl = bottom_left s
-  mm = midpoint tl br
-  tm = midpoint tl tr
-  mr = midpoint tr br
-  ml = midpoint tl bl
-  bm = midpoint bl br
+subdivideSector :: Sector -> Int -> [Sector]
+subdivideSector (Sector (a,b) (c,d)) n = [ Sector (a', b') (a' + dx, b' + dy)
+                                         | a' <- init [a, a + dx .. c]
+                                         , b' <- init [b, b + dy .. d] ] where
+    dx = (c - a) / (fromIntegral n)
+    dy = (d - b) / (fromIntegral n)
 
 distance :: PlanarCoordinate -> PlanarCoordinate -> Scalar
 distance (a, b) (c, d) = sqrt $ x*x + y*y where
